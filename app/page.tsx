@@ -162,10 +162,14 @@ export default function Home() {
               <div className="lg:col-span-2">
                 <SMSComposer
                   onSend={(data) => {
-                    setPhone(data.to);
-                    setSenderId(data.from);
+                    setPhone(data.phoneNumber);
+                    setSenderId(data.senderId);
                     setMessage(data.message);
-                    handleSendSMS(data);
+                    handleSendSMS({
+                      to: data.phoneNumber,
+                      from: data.senderId,
+                      message: data.message,
+                    });
                   }}
                   loading={loading}
                   mockMode={mockMode}
