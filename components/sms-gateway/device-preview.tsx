@@ -8,8 +8,9 @@ interface DevicePreviewProps {
   timestamp?: Date;
 }
 
-export function DevicePreview({ senderId, message, timestamp = new Date() }: DevicePreviewProps) {
-  const formatTime = (date: Date) => {
+export function DevicePreview({ senderId, message, timestamp }: DevicePreviewProps) {
+  const formatTime = (date: Date | undefined) => {
+    if (!date) return '9:41 AM';
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
@@ -52,7 +53,7 @@ export function DevicePreview({ senderId, message, timestamp = new Date() }: Dev
                       {/* Sender info */}
                       <div className="text-xs text-gray-600 mb-1 px-3">
                         <strong>{displaySenderId}</strong>
-                        <span className="text-gray-500 ml-2">{formatTime(timestamp)}</span>
+                        {timestamp && <span className="text-gray-500 ml-2">{formatTime(timestamp)}</span>}
                       </div>
                       
                       {/* Message bubble */}
