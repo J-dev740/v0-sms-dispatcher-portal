@@ -5,7 +5,7 @@ import { SMSComposer } from '@/components/sms-gateway/sms-composer';
 import { DevicePreview } from '@/components/sms-gateway/device-preview';
 import { SessionLogs, type SMSLog } from '@/components/sms-gateway/session-logs';
 import { SettingsPanel } from '@/components/sms-gateway/settings-panel';
-import { createAPIClient } from '@/lib/api-client';
+import { sendSMS } from '@/lib/api-client';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -18,18 +18,14 @@ export default function Home() {
   const [logs, setLogs] = useState<SMSLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [mockMode, setMockMode] = useState(false);
-  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:3001');
-  const [accountConnected, setAccountConnected] = useState(false);
 
   // Load settings from localStorage
   useEffect(() => {
     try {
       const savedMockMode = localStorage.getItem('sms_mock_mode') === 'true';
-      const savedApiUrl = localStorage.getItem('sms_api_base_url');
       const savedLogs = localStorage.getItem('sms_logs');
 
       setMockMode(savedMockMode);
-      if (savedApiUrl) setApiBaseUrl(savedApiUrl);
       if (savedLogs) {
         try {
           setLogs(JSON.parse(savedLogs));
@@ -48,10 +44,6 @@ export default function Home() {
   }, [mockMode]);
 
   useEffect(() => {
-    localStorage.setItem('sms_api_base_url', apiBaseUrl);
-  }, [apiBaseUrl]);
-
-  useEffect(() => {
     localStorage.setItem('sms_logs', JSON.stringify(logs));
   }, [logs]);
 
@@ -59,19 +51,23 @@ export default function Home() {
     setLoading(true);
 
     try {
-      let result: { success: boolean; sid?: string; error?: string };
+      let result: { success: boolean; messageId?: string; error?: string };
 
       if (mockMode) {
         // Mock mode: simulate success
         await new Promise((resolve) => setTimeout(resolve, 800));
         result = {
           success: true,
-          sid: `fake_sid_${Date.now()}`,
+          messageId: `fake_msg_${Date.now()}`,
         };
       } else {
-        // Real mode: call backend API
-        const apiClient = createAPIClient(apiBaseUrl);
-        result = await apiClient.sendSMS(data);
+        // Real mode: call Vercel Edge Function with Telynx
+        result = await sendSMS({
+          phoneNumber: data.to,
+          message: data.message,
+          senderId: data.from,
+          mockMode: false,
+        });
       }
 
       if (result.success) {
@@ -82,7 +78,7 @@ export default function Home() {
           senderId: data.from,
           message: data.message,
           status: 'sent',
-          sid: result.sid,
+          sid: result.messageId,
           timestamp: new Date().toISOString(),
           isMock: mockMode,
         };
@@ -203,9 +199,6 @@ export default function Home() {
             <SettingsPanel
               mockMode={mockMode}
               onMockModeChange={setMockMode}
-              apiBaseUrl={apiBaseUrl}
-              onApiBaseUrlChange={setApiBaseUrl}
-              accountConnected={accountConnected}
             />
           </TabsContent>
         </Tabs>

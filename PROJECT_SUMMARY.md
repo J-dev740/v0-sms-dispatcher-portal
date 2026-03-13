@@ -1,53 +1,50 @@
 # SMS Gateway Portal - Project Summary
 
-A complete, production-ready SMS dispatcher built with Next.js, Express, and Twilio.
+A complete, production-ready SMS dispatcher built with Next.js, Vercel Edge Functions, and Telynx. No separate backend server required.
 
 ## What's Included
 
-### Frontend (Next.js)
-- **Main Dashboard** (`app/page.tsx`): Tabbed interface for compose, preview, settings
-- **SMS Composer** (`components/sms-gateway/sms-composer.tsx`): Phone input with E.164 validation, sender ID field, message textarea
-- **Device Preview** (`components/sms-gateway/device-preview.tsx`): iPhone-style mockup showing how SMS appears
-- **Session Logs** (`components/sms-gateway/session-logs.tsx`): Table of sent messages with status badges
-- **Settings Panel** (`components/sms-gateway/settings-panel.tsx`): Mock mode toggle, API URL config, account status
+### Frontend (Next.js + React)
+- **Main Dashboard** (`app/page.tsx`): Tabbed interface (Compose, Preview, Settings)
+- **SMS Composer** (`components/sms-gateway/sms-composer.tsx`): Phone E.164 validation, sender ID field, message input
+- **Device Preview** (`components/sms-gateway/device-preview.tsx`): iPhone mockup showing SMS appearance
+- **Session Logs** (`components/sms-gateway/session-logs.tsx`): Message history with delivery status
+- **Settings Panel** (`components/sms-gateway/settings-panel.tsx`): Mock mode toggle, integration status
 
-### Backend (Express)
-- **Server** (`backend/server.ts`): Express app with CORS, error handling, graceful shutdown
-- **Validation** (`backend/middleware/validation.ts`): Zod schema validation for all inputs
-- **Twilio Service** (`backend/services/twilio-service.ts`): Handles SMS sending via Twilio SDK
-- **Send SMS Route** (`backend/routes/send-sms.ts`): POST endpoint for SMS dispatch
+### Serverless Backend (Vercel Edge Functions)
+- **SMS API Route** (`app/api/send-sms/route.ts`): Handles SMS sending via Telynx API
+- **Input Validation**: Zod schema validation (E.164 format, sender ID, message length)
+- **Error Handling**: Comprehensive error messages and logging
+- **Mock Mode**: Simulates SMS sending without Telynx API key
 
-### Utilities
-- **SMS Utils** (`lib/sms-utils.ts`): 
-  - `validateE164()`: Phone number validation
+### Utilities & Libraries
+- **SMS Utils** (`lib/sms-utils.ts`):
+  - `validateE164()`: Phone number format validation
   - `validateSenderId()`: Sender ID validation (A-Z0-9, max 11 chars)
-  - `calculateSegments()`: Smart SMS segmentation (GSM-7 vs Unicode)
-  - `detectEncoding()`: Character encoding detection
-- **API Client** (`lib/api-client.ts`): Fetch wrapper with error handling
-- **API Proxy** (`app/api/send-sms/route.ts`): Next.js route that forwards to backend
+  - `calculateSegments()`: Smart SMS segmentation (GSM-7: 160 chars, Unicode: 70 chars)
+  - `detectEncoding()`: Auto-detects character encoding
+- **API Client** (`lib/api-client.ts`): Type-safe fetch wrapper with `sendSMS()` function
 
 ### Documentation
-- **README.md**: Project overview, features, quick start
-- **SETUP_GUIDE.md**: Detailed local setup and Twilio configuration
-- **DEPLOY_INSTRUCTIONS.md**: Production deployment to Vercel + Render/Heroku
-- **PROJECT_SUMMARY.md**: This file
+- **README.md**: Complete feature overview, deployment instructions, API docs
+- **.env.example**: Environment variables template
+- **PROJECT_SUMMARY.md**: This file - architecture and setup reference
 
 ## Key Features
 
 ### SMS Intelligence
-- **GSM-7 Detection**: 160 chars/segment for ASCII text
-- **Unicode Support**: 70 chars/segment for emojis and special characters
-- **Smart Segmentation**: Accounts for User Data Header in multi-part messages
-- **Real-time Counter**: Shows character count and number of segments as you type
+- **GSM-7 Detection**: 160 characters per segment for ASCII text
+- **Unicode Support**: 70 characters per segment for emojis and special characters
+- **Smart Segmentation**: Auto-calculated based on message content
+- **Real-time Counter**: Character and segment count as you type
 
-### International Support
-- **E.164 Format**: Standardized phone numbers (+[country code][number])
-- **Country Validation**: Supports all countries with Twilio coverage
-- **Alphanumeric Branding**: Custom sender ID (11 chars, A-Z0-9)
-- **Currency**: Pay-as-you-go via Twilio
+### International Coverage
+- **E.164 Format**: Standardized phone numbers (+country code + number)
+- **Global Support**: Send to 200+ countries via Telynx
+- **Alphanumeric Sender ID**: Custom branding (11 chars, A-Z0-9)
 
-### Developer Features
-- **Mock Mode**: Test UI without SMS credits
+### Developer Experience
+- **Mock Mode**: Full UI testing without SMS credits or API key
 - **Input Validation**: Front and back-end validation
 - **Error Handling**: User-friendly error messages
 - **Session Logs**: Local browser history of sent messages

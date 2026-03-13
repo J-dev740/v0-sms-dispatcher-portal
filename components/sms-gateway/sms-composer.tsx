@@ -11,7 +11,7 @@ import { validateE164, validateSenderId, calculateSegments } from '@/lib/sms-uti
 import { AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface SMSComposerProps {
-  onSend: (data: { to: string; from: string; message: string }) => Promise<void>;
+  onSend: (data: { phoneNumber: string; senderId: string; message: string; mockMode?: boolean }) => Promise<void>;
   loading?: boolean;
   mockMode?: boolean;
 }
@@ -67,9 +67,10 @@ export function SMSComposer({ onSend, loading = false, mockMode = false }: SMSCo
     try {
       const { normalized } = validateE164(phone);
       await onSend({
-        to: normalized!,
-        from: senderId.toUpperCase(),
+        phoneNumber: normalized!,
+        senderId: senderId.toUpperCase(),
         message: message.trim(),
+        mockMode,
       });
       
       // Reset form on success

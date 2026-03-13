@@ -1,71 +1,104 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
-/**
- * POST /api/send-sms
- * 
- * This is a Next.js API route that acts as a proxy to the backend Express server.
- * It validates the request and forwards it to the backend.
- * 
- * Frontend sends requests to: POST /api/send-sms
- * Which forwards to: POST http://backend-url/api/send-sms
- */
+// Validation schema
+const SendSMSSchema = z.object({
+  phoneNumber: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format (must be E.164)'),
+  message: z.string().min(1).max(1600),
+  senderId: z.string().min(1).max(11),
+  mockMode: z.boolean().optional().default(false),
+})
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse request body
-    const body = await request.json();
+    const body = await request.json()
 
-    // Validate required fields
-    if (!body.to || !body.from || !body.message) {
+    // Validate input
+    const validation = SendSMSSchema.safeParse(body)
+    if (!validation.success) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields: to, from, message',
-          code: 'INVALID_REQUEST',
-        },
+        { error: 'Invalid request parameters', details: validation.error.errors },
         { status: 400 }
-      );
+      )
     }
 
-    // Get backend URL from environment or use default
-    const backendUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+    const { phoneNumber, message, senderId, mockMode } = validation.data
 
-    // Forward request to backend
-    const backendResponse = await fetch(`${backendUrl}/api/send-sms`, {
+    // Mock mode returns success without sending
+    if (mockMode) {
+      return NextResponse.json({
+        success: true,
+        messageId: `mock_${Date.now()}`,
+        status: 'delivered',
+        phoneNumber,
+        message,
+        senderId,
+        timestamp: new Date().toISOString(),
+        isMockMode: true,
+      })
+    }
+
+    // Check for Telynx API key
+    const telynxApiKey = process.env.TELYNX_API_KEY
+    if (!telynxApiKey) {
+      console.error('[v0] TELYNX_API_KEY is not configured')
+      return NextResponse.json(
+        { error: 'SMS service not configured. Please add TELYNX_API_KEY to environment variables.' },
+        { status: 500 }
+      )
+    }
+
+    // Call Telynx API
+    const telynxResponse = await fetch('https://api.telynx.com/v1/messages/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${telynxApiKey}`,
       },
-      body: JSON.stringify(body),
-    });
+      body: JSON.stringify({
+        to: phoneNumber,
+        from: senderId,
+        text: message,
+      }),
+    })
 
-    // Parse backend response
-    const responseData = await backendResponse.json();
+    if (!telynxResponse.ok) {
+      const errorData = await telynxResponse.json().catch(() => ({}))
+      console.error('[v0] Telynx API error:', {
+        status: telynxResponse.status,
+        error: errorData,
+      })
 
-    // Return response
-    return NextResponse.json(responseData, {
-      status: backendResponse.status,
-    });
+      return NextResponse.json(
+        {
+          error: 'Failed to send SMS',
+          details: errorData?.message || 'Unknown error from SMS provider',
+        },
+        { status: telynxResponse.status }
+      )
+    }
+
+    const telynxData = await telynxResponse.json()
+
+    // Return success response
+    return NextResponse.json({
+      success: true,
+      messageId: telynxData.messageId || telynxData.id,
+      status: 'sent',
+      phoneNumber,
+      message,
+      senderId,
+      timestamp: new Date().toISOString(),
+      provider: 'telynx',
+    })
   } catch (error) {
-    console.error('API route error:', error);
-
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error occurred';
-
+    console.error('[v0] SMS API error:', error)
     return NextResponse.json(
       {
-        success: false,
-        error: errorMessage.includes('fetch')
-          ? 'Backend service unavailable'
-          : errorMessage,
-        code: 'INTERNAL_ERROR',
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
-    );
+    )
   }
-}
-
-// Enable CORS-like behavior with OPTIONS
-export async function OPTIONS() {
-  return NextResponse.json({}, { status: 200 });
 }

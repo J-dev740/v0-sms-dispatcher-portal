@@ -1,6 +1,6 @@
-# SMS Gateway Portal
+# SMS Gateway Portal - Production Ready
 
-A production-ready SMS dispatcher with international support, alphanumeric branding, and smart message segmentation.
+A modern, full-stack SMS gateway built with Next.js, Vercel Edge Functions, and Telynx. Send international SMS with alphanumeric sender IDs, real-time character counting, and session logging.
 
 ## Features
 
@@ -11,111 +11,101 @@ A production-ready SMS dispatcher with international support, alphanumeric brand
 ✅ **Session Logs** - Track all sent messages  
 ✅ **Mock Mode** - Test without SMS credits  
 ✅ **Real-time Validation** - E.164 phone format checking  
-✅ **Production Ready** - CORS, input validation, error handling  
+✅ **Serverless Backend** - Vercel Edge Functions, no separate server  
+✅ **Production Ready** - Input validation, error handling, security
 
 ## Tech Stack
 
 - **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS, shadcn/ui
-- **Backend**: Express, Twilio SDK, zod validation
-- **Deployment**: Vercel (frontend), Render/Heroku (backend)
+- **Backend**: Vercel Edge Functions (serverless)
+- **SMS Provider**: Telynx API
+- **Deployment**: Vercel (frontend + backend)
 
 ## Quick Start
 
 ### 1. Local Development
 
-#### Clone & Install
+#### Install Dependencies
 ```bash
-git clone <your-repo>
-cd sms-gateway
-npm install
+pnpm install
 ```
 
-#### Setup Environment
-Create `.env.local`:
-```
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
-```
-
-Create `backend/.env`:
-```
-NODE_ENV=development
-PORT=3001
-CORS_ORIGIN=http://localhost:3000
-TWILIO_ACCOUNT_SID=your_sid
-TWILIO_AUTH_TOKEN=your_token
-TWILIO_PHONE_NUMBER=+1234567890
-```
-
-#### Run Frontend
+#### Run Locally
 ```bash
-npm run dev
-# Frontend at http://localhost:3000
+pnpm dev
 ```
-
-#### Run Backend (new terminal)
-```bash
-npm run dev:backend
-# Backend at http://localhost:3001
-```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 #### Test with Mock Mode
 1. Open http://localhost:3000
 2. Go to Settings tab
 3. Enable Mock Mode
-4. Send a test SMS (no credits needed!)
+4. Send test messages (no credentials needed!)
+5. View messages in Session Logs with "Mock" badge
 
-### 2. Get Twilio Credentials
+### 2. Deploy to Vercel
 
-1. Sign up: https://www.twilio.com
-2. Go to Account > API keys & tokens
-3. Copy **Account SID** and **Auth Token**
-4. Buy a number: Phone Numbers > Buy a Number
-5. Add to your `.env`
+#### Push to GitHub
+```bash
+git add .
+git commit -m "SMS Gateway Portal"
+git push origin main
+```
 
-### 3. Deploy
+#### Deploy on Vercel
+1. Go to [vercel.com](https://vercel.com)
+2. Click "Add New" → "Project"
+3. Import your GitHub repository
+4. Click "Deploy"
 
-See [DEPLOY_INSTRUCTIONS.md](./DEPLOY_INSTRUCTIONS.md) for:
-- Deploying frontend to Vercel
-- Deploying backend to Render/Heroku
-- Configuring CORS
-- Setting up production environment variables
+#### Add Telynx API Key
+1. In Vercel project settings, go to "Environment Variables"
+2. Add variable name: `TELYNX_API_KEY`
+3. Add variable value: Your Telynx API key
+4. Click "Save"
+5. Redeploy the project
+
+### 3. Get Telynx API Key
+
+1. Sign up at [telynx.com](https://telynx.com)
+2. Go to API settings in dashboard
+3. Create new API key
+4. Copy and add to Vercel environment variables
 
 ## Project Structure
 
 ```
 ├── app/
+│   ├── api/
+│   │   └── send-sms/route.ts    # Vercel Edge Function (Telynx backend)
 │   ├── page.tsx                 # Main dashboard
 │   ├── layout.tsx               # Root layout
 │   └── globals.css              # Tailwind styles
 ├── components/sms-gateway/
 │   ├── sms-composer.tsx         # Input form
-│   ├── device-preview.tsx       # Phone mockup
+│   ├── device-preview.tsx       # iPhone mockup
 │   ├── session-logs.tsx         # Message history
 │   └── settings-panel.tsx       # Configuration
 ├── lib/
 │   ├── sms-utils.ts             # GSM/Unicode detection, validation
-│   └── api-client.ts            # API wrapper
-├── backend/
-│   ├── server.ts                # Express app
-│   ├── routes/send-sms.ts       # SMS endpoint
-│   ├── services/twilio-service.ts
-│   └── middleware/validation.ts # Input validation
-├── DEPLOY_INSTRUCTIONS.md       # Production deployment guide
-└── .env.example                 # Environment template
+│   └── api-client.ts            # Fetch wrapper for /api/send-sms
+├── public/                       # Static assets
+└── README.md                     # This file
 ```
 
 ## API Documentation
 
-### POST /api/send-sms
+### POST `/api/send-sms`
 
-Send an SMS via Twilio.
+Send an SMS via Telynx Edge Function.
 
 **Request**:
 ```json
 {
-  "to": "+1234567890",      // E.164 format
-  "from": "COMPANY",         // Alphanumeric, max 11 chars
-  "message": "Hello world"   // 1-4000 chars
+  "phoneNumber": "+1234567890",    // E.164 format (required)
+  "message": "Hello world",        // 1-1600 chars (required)
+  "senderId": "COMPANY",           // Alphanumeric, max 11 chars (required)
+  "mockMode": false                // Test without credits (optional)
 }
 ```
 
@@ -123,179 +113,174 @@ Send an SMS via Twilio.
 ```json
 {
   "success": true,
-  "sid": "SM1234567890abcdef"  // Twilio message SID
+  "messageId": "msg_abc123def456",
+  "status": "sent",
+  "timestamp": "2024-03-13T10:30:00Z",
+  "provider": "telynx"
 }
 ```
 
 **Response (Error)**:
 ```json
 {
-  "success": false,
   "error": "Invalid phone number format",
-  "code": "VALIDATION_ERROR"
+  "details": "Must be E.164 format (+1234567890)"
 }
 ```
 
+**Status Codes**:
+- `200`: SMS sent successfully
+- `400`: Invalid request parameters
+- `500`: Server error or Telynx API failure
+
 ## Usage Examples
 
-### Send a Simple Message
+### Send SMS from Frontend
 
 ```typescript
-const response = await fetch('http://localhost:3001/api/send-sms', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    to: '+1234567890',
-    from: 'ACME',
-    message: 'Your confirmation code is: 123456'
-  })
+import { sendSMS } from '@/lib/api-client';
+
+const response = await sendSMS({
+  phoneNumber: '+1234567890',
+  message: 'Your confirmation code is: 123456',
+  senderId: 'ACME',
+  mockMode: false
 });
+
+if (response.success) {
+  console.log('Sent:', response.messageId);
+}
 ```
 
-### International Numbers
+### International Phone Numbers
 
 ```
-US:      +1 (country code 1)
-UK:      +44
-India:   +91
-Japan:   +81
-Brazil:  +55
+US:      +1 + number (e.g., +12125551234)
+UK:      +44 + number (e.g., +441234567890)
+India:   +91 + number (e.g., +919876543210)
+Japan:   +81 + number (e.g., +8190xxxxxxxx)
+Brazil:  +55 + number (e.g., +5511xxxxxxxx)
 ```
 
 ### Message Segmentation
 
-- **GSM-7**: 160 chars/segment, 153 for multi-part
-- **Unicode**: 70 chars/segment, 67 for multi-part
+- **GSM-7** (A-Z, 0-9, @, etc.): **160 chars** per segment
+- **Unicode** (emojis, accents): **70 chars** per segment
+- Multi-part automatically calculated for long messages
 - Auto-detected based on message content
 
 ## Configuration
 
 ### Frontend Settings
-- **Mock Mode**: Toggle to test without sending
-- **API Base URL**: Point to your backend deployment
-- **Account Status**: Shows Twilio connection status
+- **Mock Mode**: Toggle in Settings to test without SMS credits
+- **Integration Status**: Shows Telynx connection status
+- **Device Preview**: Real-time iPhone mockup of messages
+- **Session Logs**: Persistent message history in browser
 
-### Backend Environment Variables
+### Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `PORT` | Server port | `3001` |
-| `NODE_ENV` | Environment | `production` |
-| `CORS_ORIGIN` | Frontend URL | `https://app.vercel.app` |
-| `TWILIO_ACCOUNT_SID` | Twilio auth | From Twilio console |
-| `TWILIO_AUTH_TOKEN` | Twilio auth | From Twilio console |
-| `TWILIO_PHONE_NUMBER` | Sender number | `+1234567890` |
+| Variable | Description | Required | Where |
+|----------|-------------|----------|-------|
+| `TELYNX_API_KEY` | Telynx API authentication key | ✅ Prod only | Vercel env vars |
+
+**Note**: The API key is used server-side only in Vercel Edge Functions. No exposure to client.
 
 ## Security
 
-- ✅ API keys stored in backend environment only
-- ✅ Input validation on both frontend and backend
-- ✅ CORS restricted to specified domain
+- ✅ API keys stored server-side only (Vercel environment variables)
+- ✅ Input validation with Zod schemas (frontend + backend)
 - ✅ E.164 phone number format validation
-- ✅ Alphanumeric sender ID validation
-- ✅ No sensitive data in error messages (production)
-- ✅ 1KB request size limit
-- ✅ HTTPS required in production
+- ✅ Alphanumeric sender ID validation (A-Z, 0-9 only)
+- ✅ Message length validation (1-1600 characters)
+- ✅ Vercel Edge Function isolation
+- ✅ No sensitive data in client-side code
+- ✅ HTTPS enforced by Vercel
 
 ## Testing
 
-### Mock Mode Testing
-```bash
-# Enable Mock Mode in Settings
-# Send test SMS without credits
-# View in Session Logs with "Mock" badge
-```
+### Mock Mode (No Credentials Needed)
+1. Enable "Mock Mode" in Settings tab
+2. Send test messages without SMS credits
+3. Messages appear with "Mock" badge in Session Logs
+4. Perfect for UI testing and development
 
 ### Real SMS Testing
-```bash
-# With Twilio trial account
-# Verify your phone number
-# Use test credits for development
-# Monitor usage in Twilio dashboard
-```
+1. Add `TELYNX_API_KEY` to Vercel environment variables
+2. Disable Mock Mode in Settings
+3. Send SMS to verify phone numbers
+4. Check Telynx dashboard for delivery status
 
 ### Validation Testing
-```bash
-# Test invalid phone: "not-a-number"
-# Test short number: "+1"
-# Test long sender ID: "ABCDEFGHIJKLMNOP"
-```
+- **Invalid phone**: Try "123" or "not-a-number" → Shows error
+- **Short number**: Try "+1" → Fails E.164 validation
+- **Long sender ID**: Try "ABCDEFGHIJKLMNOP" → Gets truncated
+- **Special chars**: Try "Hello 🎉!" → Unicode detection triggers 70-char limit
 
-## Performance Optimization
+## Performance
 
-- **Frontend**: localStorage caches settings and logs
-- **Backend**: Input validation before Twilio API call
-- **Twilio**: Connection pooling via SDK
-- **Deployment**: CDN via Vercel/Render
+- **Frontend**: Instant UI via React + Tailwind
+- **Backend**: Vercel Edge Functions with 0ms cold starts
+- **Validation**: Input validation before API call
+- **Caching**: Browser localStorage for settings and logs
+- **Deployment**: Global CDN via Vercel
 
 ## Troubleshooting
 
-### "Network error. Check API URL and CORS configuration"
-- Verify API URL in Settings tab
-- Check backend `CORS_ORIGIN` matches frontend URL
-- Ensure backend is running/deployed
+### "SMS service not configured"
+- Add `TELYNX_API_KEY` to Vercel environment variables
+- Wait 1-2 minutes for deployment to update
+- Check Vercel Deployments tab for completion
 
 ### "Invalid phone number format"
-- Use E.164 format: +[country code][number]
-- Example: +1234567890 (not 1234567890)
+- Use E.164 format: `+[country code][number]`
+- ✅ Correct: `+12125551234`, `+441234567890`
+- ❌ Wrong: `1234567890`, `+1-212-555-1234`
 
-### "Twilio authentication failed"
-- Verify TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN
-- Check they haven't been regenerated in Twilio console
-- Restart backend service
+### "Messages not being sent (not in mock mode)"
+- Verify Telynx API key is valid
+- Check Telynx account has SMS balance
+- View Vercel function logs for details
+- Try Mock Mode to test UI without API key
 
-### Sessions Logs disappear on refresh
-- Logs are stored in browser localStorage
+### Session Logs disappear on refresh
+- Logs stored in browser localStorage (persistent)
 - Clearing browser data removes logs
-- For persistent storage, add a database (see DEPLOY_INSTRUCTIONS.md)
-
-## Scaling
-
-### For High Volume
-1. Implement message queues (Bull, RabbitMQ)
-2. Add rate limiting to prevent abuse
-3. Use Twilio's batch SMS API
-4. Deploy backend across multiple instances
-
-### Add Database
-1. Use Supabase or Neon PostgreSQL
-2. Store sent messages permanently
-3. Track delivery status
-4. Audit trail for compliance
+- Use browser DevTools to inspect `sms_logs` value
 
 ## Customization
 
-### Change Default Sender Number
-Modify `backend/routes/send-sms.ts` to accept dynamic sender from request.
-
 ### Add User Authentication
-1. Implement login with Supabase or Auth.js
+1. Integrate Supabase or Auth.js
 2. Protect `/api/send-sms` endpoint
-3. Store user-specific settings
+3. Store user-specific settings/logs
 
-### Multi-language UI
-1. Add next-intl library
-2. Wrap components with language provider
-3. Add language selector to header
+### Add Database for Message History
+1. Use Neon or Supabase PostgreSQL
+2. Store sent messages for audit trail
+3. Add delivery status tracking
 
-## Contributing
+### Support Multiple Sender IDs
+- Modify `app/api/send-sms/route.ts` to validate sender list
+- Load sender IDs from environment or database
+- Return 400 for unauthorized senders
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+## Next Steps
 
-## License
+- ✅ Deploy to production on Vercel
+- ✅ Get Telynx API key and add to env vars
+- ✅ Test with Mock Mode first
+- ✅ Send real SMS with Telynx
+- ✅ Monitor usage in Telynx dashboard
+- ✅ Add database for message persistence
+- ✅ Implement user authentication
 
-Open source. Modify and deploy as needed.
+## Resources
 
-## Support
-
-- **Twilio Docs**: https://www.twilio.com/docs
-- **Next.js**: https://nextjs.org/docs
-- **Express**: https://expressjs.com
-- **Issues**: Open an issue on GitHub
+- **Next.js Docs**: https://nextjs.org/docs
+- **Vercel Docs**: https://vercel.com/docs
+- **Telynx API**: https://telynx.com/docs
+- **Zod Validation**: https://zod.dev
 
 ---
 
-Built with ❤️ for developers who need reliable SMS infrastructure.
+Built for production. Ready to scale.
