@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import twilio from 'twilio'
 
 // Validation schema
 const SendSMSSchema = z.object({
@@ -38,58 +39,39 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Check for Telynx API key
-    const telynxApiKey = process.env.TELYNX_API_KEY
-    if (!telynxApiKey) {
-      console.error('[v0] TELYNX_API_KEY is not configured')
+    // Check for Twilio credentials
+    const accountSid = process.env.TWILIO_ACCOUNT_SID
+    const authToken = process.env.TWILIO_AUTH_TOKEN
+    const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER
+
+    if (!accountSid || !authToken || !twilioPhoneNumber) {
+      console.error('[v0] Twilio credentials not configured')
       return NextResponse.json(
-        { error: 'SMS service not configured. Please add TELYNX_API_KEY to environment variables.' },
+        { error: 'SMS service not configured. Please add Twilio credentials to environment variables.' },
         { status: 500 }
       )
     }
 
-    // Call Telynx API
-    const telynxResponse = await fetch('https://api.telynx.com/v1/messages/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${telynxApiKey}`,
-      },
-      body: JSON.stringify({
-        to: phoneNumber,
-        from: senderId,
-        text: message,
-      }),
+    // Initialize Twilio client
+    const client = twilio(accountSid, authToken)
+
+    // Send SMS via Twilio
+    const twilioMessage = await client.messages.create({
+      body: message,
+      from: twilioPhoneNumber,
+      to: phoneNumber,
     })
-
-    if (!telynxResponse.ok) {
-      const errorData = await telynxResponse.json().catch(() => ({}))
-      console.error('[v0] Telynx API error:', {
-        status: telynxResponse.status,
-        error: errorData,
-      })
-
-      return NextResponse.json(
-        {
-          error: 'Failed to send SMS',
-          details: errorData?.message || 'Unknown error from SMS provider',
-        },
-        { status: telynxResponse.status }
-      )
-    }
-
-    const telynxData = await telynxResponse.json()
 
     // Return success response
     return NextResponse.json({
       success: true,
-      messageId: telynxData.messageId || telynxData.id,
-      status: 'sent',
+      messageId: twilioMessage.sid,
+      status: twilioMessage.status,
       phoneNumber,
       message,
       senderId,
       timestamp: new Date().toISOString(),
-      provider: 'telynx',
+      provider: 'twilio',
     })
   } catch (error) {
     console.error('[v0] SMS API error:', error)
